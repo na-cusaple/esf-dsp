@@ -1,0 +1,14 @@
+# Build outputs
+build/
+Debug/
+Release/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Data/artifacts
+*.log
+*.wav
+*.npy
