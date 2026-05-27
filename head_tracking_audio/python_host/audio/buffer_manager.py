@@ -32,16 +32,6 @@ class AudioFileBuffer:
 
 		return cls(audio, sr)
 
-
-def _resample_audio(audio, src_rate, dst_rate):
-	if src_rate == dst_rate:
-		return audio
-
-	g = math.gcd(int(src_rate), int(dst_rate))
-	up = int(dst_rate // g)
-	down = int(src_rate // g)
-	return resample_poly(audio, up, down).astype(np.float32)
-
 	def get_block(self, frames):
 		if frames <= 0 or self.length == 0:
 			return np.zeros((frames,), dtype=np.float32)
@@ -56,6 +46,16 @@ def _resample_audio(audio, src_rate, dst_rate):
 		head = self.audio[0:end - self.length]
 		self.position = end - self.length
 		return np.concatenate((tail, head))
+
+
+def _resample_audio(audio, src_rate, dst_rate):
+	if src_rate == dst_rate:
+		return audio
+
+	g = math.gcd(int(src_rate), int(dst_rate))
+	up = int(dst_rate // g)
+	down = int(src_rate // g)
+	return resample_poly(audio, up, down).astype(np.float32)
 
 
 class OverlapAddConvolver:

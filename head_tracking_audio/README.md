@@ -68,9 +68,41 @@ pip install -r requirements.txt
 
 Note: requirements.txt uses pinned versions for reproducibility.
 
-Run entry (placeholder):
+## Run checklist
+1) Place a mono WAV file under audio/ (or any path you will reference)
+2) Place a CIPIC .mat HRTF file under hrtf/
+3) Identify your serial port (e.g. /dev/tty.usbmodemXXXX or COM3)
+
+Note: HRTF datasets and test audio are not bundled with this repo.
+
+## Assets (download or generate)
+HRTF (CIPIC, MAT format):
+- https://interface.cipic.ucdavis.edu/sound/hrtf.html
+- Download the MAT archive and place subject_*.mat files under hrtf/
+
+Test audio (mono WAV):
+- Use any mono WAV you own, or generate a short tone:
 ```bash
-python -m python_host.main
+python - <<'PY'
+import numpy as np
+import soundfile as sf
+
+sr = 48000
+t = np.linspace(0, 5.0, int(5.0 * sr), endpoint=False)
+tone = 0.2 * np.sin(2 * np.pi * 440.0 * t)
+sf.write("audio/test_tone.wav", tone.astype(np.float32), sr)
+print("Wrote audio/test_tone.wav")
+PY
+```
+
+Run entry (realtime spatial audio):
+```bash
+python -m python_host.audio.spatializer --input audio/your_mono.wav --hrtf hrtf/subject_003.mat --port /dev/tty.usbmodemXXXX
+```
+
+Visualization only (no audio rendering):
+```bash
+python -m python_host.main --mode plot --port /dev/tty.usbmodemXXXX
 ```
 
 ## STM32CubeIDE (embedded build)
