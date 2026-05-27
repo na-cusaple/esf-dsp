@@ -1,25 +1,25 @@
-# Latency Notes
+# Ghi chú độ trễ
 
-## Components
-- UART delay: device -> host transport time.
-- Queue age: time from host receive to worker consume.
-- HRTF update period: 1 / HRTF_UPDATE_HZ (default 20 ms).
+## Thành phần
+- UART delay: thời gian truyền từ device -> host.
+- Queue age: thời gian từ khi host nhận đến khi worker xử lý.
+- Chu kỳ cập nhật HRTF: 1 / HRTF_UPDATE_HZ (mặc định 20 ms).
 - Audio buffer: block size / sample rate.
-- Callback processing time.
+- Thời gian xử lý callback.
 
-## Rough model
+## Mô hình gần đúng
 T_e2e = d_uart + d_queue + T_update + T_proc + T_buffer + T_dac
 
-Where:
+Trong đó:
 - T_buffer = L / Fs
 - T_update = 1 / f_update
 
-## Monitoring
-LatencyMonitor tracks:
-- callback elapsed vs budget (overruns)
+## Theo dõi
+LatencyMonitor theo dõi:
+- thời gian callback so với budget (overrun)
 - queue age
 - uart delay (EMA time offset)
 
-## Notes
-- Worst case orientation staleness is in [0, 1/f_update].
-- If T_proc > T_buffer, underruns will occur.
+## Ghi chú
+- Trường hợp xấu nhất, độ cũ của orientation nằm trong [0, 1/f_update].
+- Nếu T_proc > T_buffer sẽ xảy ra underrun.

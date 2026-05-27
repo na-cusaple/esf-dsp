@@ -1,64 +1,64 @@
-# Head Tracking Audio
+# Hệ thống Head Tracking Audio
 
-Real-time head tracking and spatial audio pipeline:
-- Embedded (STM32 + IMU) -> sensor fusion -> UART stream
-- Python host -> HRTF select -> FFT convolution -> audio output
+Pipeline âm thanh không gian thời gian thực có head tracking:
+- Embedded (STM32 + IMU) -> hợp nhất cảm biến -> truyền UART
+- Python host -> chọn HRTF -> FFT convolution -> audio output
 
-## Repo layout
-- embedded/         STM32 firmware source (App/BSP/Fusion/Comm/Debug)
-- python_host/      Python runtime (serial, DSP, audio, visualization)
-- docs/             Architecture and protocol notes
-- tools/            Calibration and benchmarks
-- hrtf/             HRTF datasets (CIPIC, SOFA, HRIR)
-- audio/            Audio assets or test clips
+## Bố cục repo
+- embedded/         Source firmware STM32 (App/BSP/Fusion/Comm/Debug)
+- python_host/      Runtime Python (serial, DSP, audio, visualization)
+- docs/             Ghi chú kiến trúc và giao thức
+- tools/            Hiệu chuẩn và đo hiệu năng
+- hrtf/             Bộ dữ liệu HRTF (CIPIC, SOFA, HRIR)
+- audio/            Tài nguyên âm thanh hoặc clip thử
 
-## Architecture
-Runtime flow (target):
+## Kiến trúc
+Luồng chạy (mục tiêu):
 MPU6050 (200 Hz) -> imu_task -> Madgwick/Complementary -> Quaternion
 -> UART DMA (460800 baud)
 -> Python serial thread -> orientation queue -> audio engine
 -> HRTF selector -> FFT convolution
 -> sounddevice callback (48 kHz) -> headphones
 
-## Wiring (STM32F401RE + MPU6050)
+## Đấu nối (STM32F401RE + MPU6050)
 - SDA: PB9
 - SCL: PB8
 - VCC: 3.3V
 - GND: GND
 
-Notes:
-- Add I2C pull-ups (2.2k-4.7k) if the module does not include them.
-- UART uses 3.3V logic with common GND.
+Ghi chú:
+- Thêm điện trở kéo lên I2C (2.2k-4.7k) nếu module không có sẵn.
+- UART dùng logic 3.3V và chung GND.
 
-## Performance targets
+## Mục tiêu hiệu năng
 - IMU sample rate: 200 Hz
-- End-to-end latency target: < 30 ms
+- Mục tiêu độ trễ end-to-end: < 30 ms
 - UART baudrate: 460800+
 - Audio sample rate: 48 kHz
-- Buffer size target: 128-512 samples
+- Buffer size mục tiêu: 128-512 mẫu
 
-## Runtime threads
+## Luồng chạy
 STM32:
 ```
 [TIM2 IRQ]
-	-> read IMU
-	-> fusion update
+	-> đọc IMU
+	-> cập nhật fusion
 	-> UART DMA
 ```
 
 Python:
 ```
 [Serial Thread]
-	-> parse packet
-	-> orientation queue
+	-> parse gói tin
+	-> hàng đợi orientation
 
 [Audio Thread]
-	-> HRTF selection
+	-> chọn HRTF
 	-> convolution
-	-> output callback
+	-> callback đầu ra
 ```
 
-## Setup
+## Cài đặt
 Python host (macOS/Linux):
 ```bash
 python -m venv .venv
@@ -66,22 +66,29 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Note: requirements.txt uses pinned versions for reproducibility.
+Tùy chọn (cài editable + entrypoints):
+```bash
+pip install -e .
+pip install -e .[dev]
+```
 
-## Run checklist
-1) Place a mono WAV file under audio/ (or any path you will reference)
-2) Place a CIPIC .mat HRTF file under hrtf/
-3) Identify your serial port (e.g. /dev/tty.usbmodemXXXX or COM3)
+Ghi chú: requirements.txt dùng phiên bản pin để tái lập môi trường.
+Ghi chú: sounddevice cần PortAudio; viewer 3D cần SDL/OpenGL qua pygame.
 
-Note: HRTF datasets and test audio are not bundled with this repo.
+## Checklist chạy
+1) Đặt file WAV mono trong audio/ (hoặc đường dẫn bạn muốn dùng)
+2) Đặt file HRTF CIPIC .mat trong hrtf/
+3) Xác định cổng serial (ví dụ: /dev/tty.usbmodemXXXX hoặc COM3)
 
-## Assets (download or generate)
-HRTF (CIPIC, MAT format):
+Ghi chú: dữ liệu HRTF và audio test không kèm trong repo.
+
+## Tài nguyên (tải về hoặc tạo)
+HRTF (CIPIC, định dạng MAT):
 - https://interface.cipic.ucdavis.edu/sound/hrtf.html
-- Download the MAT archive and place subject_*.mat files under hrtf/
+- Tải gói MAT và đặt các file subject_*.mat dưới hrtf/
 
-Test audio (mono WAV):
-- Use any mono WAV you own, or generate a short tone:
+Âm thanh thử (WAV mono):
+- Dùng bất kỳ WAV mono nào của bạn, hoặc tạo tone ngắn:
 ```bash
 python - <<'PY'
 import numpy as np
@@ -91,105 +98,119 @@ sr = 48000
 t = np.linspace(0, 5.0, int(5.0 * sr), endpoint=False)
 tone = 0.2 * np.sin(2 * np.pi * 440.0 * t)
 sf.write("audio/test_tone.wav", tone.astype(np.float32), sr)
-print("Wrote audio/test_tone.wav")
+print("Đã ghi audio/test_tone.wav")
 PY
 ```
 
-Run entry (realtime spatial audio):
+Chạy realtime spatial audio:
 ```bash
 python -m python_host.audio.spatializer --input audio/your_mono.wav --hrtf hrtf/subject_003.mat --port /dev/tty.usbmodemXXXX
 ```
 
-Visualization only (no audio rendering):
+Lệnh nếu đã cài:
+```bash
+hta-audio --input audio/your_mono.wav --hrtf hrtf/subject_003.mat --port /dev/tty.usbmodemXXXX
+```
+
+Chỉ hiển thị (không render audio):
 ```bash
 python -m python_host.main --mode plot --port /dev/tty.usbmodemXXXX
 ```
 
-## STM32CubeIDE (embedded build)
-Recommended: keep CubeIDE workspace separate from the repo.
+Lệnh nếu đã cài:
+```bash
+hta-imu --mode plot --port /dev/tty.usbmodemXXXX
+```
 
-1) Create workspace (example)
+Ghi chú: HRIR CIPIC thường 44100 Hz; bộ nạp sẽ resample để khớp sample rate
+của audio. Override bằng --hrtf-sr nếu cần.
+
+Xem thêm: docs/runtime.md
+
+## STM32CubeIDE (build embedded)
+Khuyến nghị: để workspace CubeIDE tách khỏi repo.
+
+1) Tạo workspace (ví dụ)
 ```bash
 mkdir -p ~/stm32_ws
 ```
 
-2) Create a new STM32 project in CubeIDE
+2) Tạo project STM32 mới trong CubeIDE
 - File -> New -> STM32 Project
-- Select MCU/board, name it (example: head_tracking_audio_fw)
+- Chọn MCU/board, đặt tên (ví dụ: head_tracking_audio_fw)
 
-3) Link repo sources into the CubeIDE project
-In Project Explorer:
+3) Liên kết source repo vào project CubeIDE
+Trong Project Explorer:
 - Right click project -> New -> Folder -> Advanced
-- Link to alternate location -> select repo paths:
+- Link to alternate location -> chọn các đường dẫn:
 	- head_tracking_audio/embedded/App
 	- head_tracking_audio/embedded/BSP
 	- head_tracking_audio/embedded/Fusion
 	- head_tracking_audio/embedded/Comm
 	- head_tracking_audio/embedded/Debug
 
-4) Add include paths
+4) Thêm include paths
 Project -> Properties -> C/C++ General -> Paths and Symbols -> Includes
-Add the same folders listed above.
+Thêm các thư mục như trên.
 
-5) Configure peripherals in CubeMX
-- I2C for MPU6050
-- UART for streaming
-- TIM2 for tick/interrupt (if used)
+5) Cấu hình peripheral trong CubeMX
+- I2C cho MPU6050
+- UART để streaming
+- TIM2 cho tick/interrupt (nếu dùng)
 
 6) Build
-- Build Debug or Release in CubeIDE
-- Output directories (Debug/Release) are ignored by .gitignore
+- Build Debug hoặc Release trong CubeIDE
+- Thư mục output (Debug/Release) đã được ignore trong .gitignore
 
-## Embedded build layout
-- embedded/Core     CubeIDE generated startup, main, and HAL glue
-- embedded/Drivers  CMSIS and HAL drivers (generated)
-- embedded/App      Application tasks and state machine
-- embedded/BSP      Board and sensor drivers (mpu6050, i2c_if, uart_if)
+## Bố cục build embedded
+- embedded/Core     Startup, main, và HAL glue do CubeIDE tạo
+- embedded/Drivers  CMSIS và HAL drivers (generated)
+- embedded/App      Application tasks và state machine
+- embedded/BSP      Board và sensor drivers (mpu6050, i2c_if, uart_if)
 - embedded/Fusion   Complementary/Madgwick/quaternion utilities
-- embedded/Comm     Serial protocol and packet format
-- embedded/Debug    Debug logging and plotting hooks
+- embedded/Comm     Serial protocol và packet format
+- embedded/Debug    Debug logging và plotting hooks
 
-Note: if you switch build output to embedded/build, keep it ignored in .gitignore.
+Ghi chú: nếu đổi output build sang embedded/build, nhớ ignore trong .gitignore.
 
-## Development phases
-Phase 1:
+## Các giai đoạn phát triển
+Giai đoạn 1:
 - mpu6050.c, imu_task.c, serial_reader.py, realtime_plot.py
 
-Phase 2:
+Giai đoạn 2:
 - complementary.c
 
-Phase 3:
+Giai đoạn 3:
 - madgwick.c, quaternion.c
 
-Phase 4:
+Giai đoạn 4:
 - hrtf_loader.py, convolution.py, audio_stream.py
 
-## Protocol
-Quaternion packet (preferred):
+## Giao thức
+Gói quaternion (ưu tiên):
 qw,qx,qy,qz,timestamp\n
 
-Debug packet (Euler):
+Gói debug (Euler):
 roll,pitch,yaw\n
 
-## Current status
-- [ ] STM32 project created
-- [ ] I2C communication verified
-- [ ] MPU6050 WHO_AM_I verified
-- [ ] Raw accelerometer stream
-- [ ] Complementary filter
+## Trạng thái hiện tại
+- [ ] Đã tạo project STM32
+- [ ] Đã xác minh giao tiếp I2C
+- [ ] Đã kiểm tra WHO_AM_I của MPU6050
+- [ ] Stream accelerometer thô
+- [ ] Bộ lọc complementary
 - [ ] Madgwick fusion
-- [ ] Python serial visualization
-- [ ] Realtime HRTF audio
+- [ ] Hiển thị serial bằng Python
+- [ ] Audio HRTF realtime
 
-## Future upgrades
-- Quaternion-only pipeline
-- SOFA HRTF support
-- Dynamic interpolation between HRTFs
+## Hướng phát triển
+- Pipeline chỉ dùng quaternion
+- Hỗ trợ HRTF SOFA
+- Nội suy động giữa các HRTF
 - BLE streaming
-- Embedded DSP acceleration
+- Tăng tốc DSP phía embedded
 - GPU convolution
 
-## TODO
-- Fill wiring/pin map and MCU/board details
-- Define serial packet schema and sample rate
-- Add Python run scripts and test data
+## Việc cần làm
+- Bổ sung wiring/pin map và chi tiết MCU/board
+- Thêm script chạy Python và test data

@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "head-tracking-audio"
+version = "0.1.0"
+description = "Real-time head tracking and spatial audio pipeline."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy==2.1.0",
+    "scipy==1.14.0",
+    "pyserial==3.5",
+    "sounddevice==0.5.0",
+    "matplotlib==3.9.0",
+    "soundfile==0.12.1",
+    "pygame==2.6.0",
+    "PyOpenGL==3.1.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.2.1",
+    "ruff==0.5.7",
+]
+
+[project.scripts]
+hta-audio = "python_host.audio.spatializer:main"
+hta-imu = "python_host.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["python_host*"]

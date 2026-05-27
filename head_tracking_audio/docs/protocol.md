@@ -1,29 +1,29 @@
-# Serial Protocol
+# Giao thức Serial
 
-## Overview
-The embedded firmware streams quaternion orientation samples over UART as an ASCII CSV line.
-The Python host expects this format in python_host/serial/parser.py.
+## Tổng quan
+Firmware embedded stream các mẫu orientation dạng quaternion qua UART theo dòng CSV ASCII.
+Python host mong đợi định dạng này trong python_host/serial/parser.py.
 
-## Packet format (quaternion)
+## Định dạng gói (quaternion)
 qw,qx,qy,qz,timestamp_ms\n
 
-- qw,qx,qy,qz: unit quaternion components (float, normalized on the MCU).
-- timestamp_ms: device tick in milliseconds (uint32 from HAL_GetTick).
-- Fields are formatted with 6 decimal digits, newline terminated.
+- qw,qx,qy,qz: các thành phần quaternion đơn vị (float, đã chuẩn hóa trên MCU).
+- timestamp_ms: device tick theo mili giây (uint32 từ HAL_GetTick).
+- Các trường được format với 6 chữ số thập phân, kết thúc bằng newline.
 
-Example:
+Ví dụ:
 0.998532,0.012345,-0.033210,0.045678,1234567
 
-## Debug packet (optional)
+## Gói debug (tuỳ chọn)
 roll,pitch,yaw\n
 
-- Euler angles in degrees.
-- Not parsed by the current host parser (it will ignore lines with fewer than 5 fields).
+- Góc Euler theo độ.
+- Không được parser hiện tại đọc (nó bỏ qua các dòng có ít hơn 5 trường).
 
-## Transport
-- UART baudrate: 460800 by default.
-- ASCII CSV, no checksum.
+## Truyền tải
+- UART baudrate: mặc định 460800.
+- ASCII CSV, không checksum.
 
-## Notes
-- If the packet format changes, update parser.py and any tooling.
-- When the host queue is full, old samples are dropped to keep latency low.
+## Ghi chú
+- Nếu format gói thay đổi, cập nhật parser.py và các tool liên quan.
+- Khi hàng đợi host đầy, mẫu cũ sẽ bị drop để giữ độ trễ thấp.

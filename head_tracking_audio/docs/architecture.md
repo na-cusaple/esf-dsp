@@ -1,66 +1,68 @@
-# Architecture
+# Kiến trúc
 
-## Overview
-This project builds a head-tracked spatial audio pipeline:
-- STM32 IMU -> quaternion stream over UART
-- Python host -> orientation queue -> dynamic HRTF -> realtime stereo output
+## Tổng quan
+Dự án xây dựng pipeline âm thanh không gian có head tracking:
+- STM32 IMU -> stream quaternion qua UART
+- Python host -> orientation queue -> HRTF động -> đầu ra stereo thời gian thực
 
-## Repository layout
-- embedded/     STM32 firmware (BSP, Fusion, App, Comm)
-- python_host/  Serial, DSP, audio, and visualization
-- hrtf/         HRTF datasets (not included)
-- audio/        Test audio clips
-- docs/         Design notes and diagrams
-- tools/        Benchmarks and calibration helpers
+## Bố cục repo
+- embedded/     Firmware STM32 (BSP, Fusion, App, Comm)
+- python_host/  Serial, DSP, audio và hiển thị
+- hrtf/         Bộ dữ liệu HRTF (không kèm trong repo)
+- audio/        Clip âm thanh thử
+- docs/         Ghi chú thiết kế và sơ đồ
+- tools/        Benchmark và công cụ hiệu chuẩn
 
-## Data flow
+## Luồng dữ liệu
 Embedded:
-- MPU6050 sample @ 200 Hz
+- MPU6050 lấy mẫu 200 Hz
 - Madgwick IMU fusion -> quaternion
 - UART DMA @ 460800 baud
 
 Host:
 - Serial thread -> parse quaternion
-- Orientation worker -> smoothing + HRTF update
-- Audio callback -> overlap-add FFT convolution -> stereo output
+- Orientation worker -> làm mượt + cập nhật HRTF
+- Audio callback -> overlap-add FFT convolution -> đầu ra stereo
 
-## Thread model (Python)
-- Serial thread: read UART, enqueue packets
-- Orientation worker: consume queue, update HRTF filter
-- Audio callback: render audio frames only (no blocking)
+## Mô hình luồng (Python)
+- Serial thread: đọc UART, đưa gói vào queue
+- Orientation worker: lấy queue, cập nhật filter HRTF
+- Audio callback: chỉ render frame audio (không block)
 
-## Protocol
-Quaternion packet (primary):
+## Giao thức
+Gói quaternion (chính):
 qw,qx,qy,qz,timestamp_ms\n
 
-Debug packet (optional):
+Gói debug (tuỳ chọn):
 roll,pitch,yaw\n
 
-## Timing targets
+## Mục tiêu thời gian
 - IMU sample rate: 200 Hz
 - UART baudrate: 460800+
 - Audio sample rate: 48 kHz
-- Block size: 256 (tune 1024/512/256/128)
-- End-to-end latency target: < 30 ms
+- Block size: 256 (tinh chỉnh 1024/512/256/128)
+- Mục tiêu độ trễ end-to-end: < 30 ms
 
-## HRTF datasets
-Datasets are not committed. Suggested layout:
+## Bộ dữ liệu HRTF
+Dữ liệu không được commit. Bố cục gợi ý:
 hrtf/
 	cipic/
 		subject_003/
 			hrir_final_003.mat
 
-The realtime and offline pipelines load a CIPIC .mat file directly.
+Pipeline realtime và offline đọc trực tiếp file CIPIC .mat.
 
-## Realtime audio pipeline
-Audio is processed in fixed blocks with overlap-add FFT convolution.
-HRIR FFTs are precomputed on update to avoid per-callback FFT work.
+## Pipeline audio thời gian thực
+Audio được xử lý theo block cố định bằng overlap-add FFT convolution.
+FFT của HRIR được tính trước khi cập nhật để tránh FFT trong callback.
+Nếu sample rate của HRTF khác audio, HRIR sẽ được resample khi load.
 
-## Benchmarks
-Use tools/benchmark_audio.py to sweep block sizes and measure headroom.
+## Đo hiệu năng
+Dùng tools/benchmark_audio.py để quét block size và đo headroom.
 
-## Known constraints
-- Yaw will still drift without a magnetometer.
-- HRTF interpolation is linear between nearest azimuths.
-- Audio is resampled at load time if a target sample rate is requested.
+## Giới hạn đã biết
+- Yaw vẫn drift nếu không có magnetometer.
+- Nội suy HRTF tuyến tính theo azimuth gần nhất.
+- Audio được resample khi load nếu có target sample rate.
+- Cập nhật HRTF thay convolver có thể gây click; có thể giảm bằng crossfade.
 

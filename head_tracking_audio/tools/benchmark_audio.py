@@ -4,6 +4,7 @@ import time
 from python_host.dsp.hrtf_loader import load_cipic_mat
 from python_host.dsp.hrtf_selector import select_hrir
 from python_host.audio.buffer_manager import AudioFileBuffer, OverlapAddConvolver
+from python_host.config.audio_config import HRTF_SAMPLE_RATE
 
 
 def _parse_block_sizes(value):
@@ -15,9 +16,13 @@ def _parse_block_sizes(value):
     return sizes
 
 
-def benchmark(input_wav, hrtf_mat, yaw, pitch, blocks, block_sizes):
+def benchmark(input_wav, hrtf_mat, yaw, pitch, blocks, block_sizes, hrtf_sample_rate=None):
     audio_buffer = AudioFileBuffer.from_wav(input_wav)
-    dataset = load_cipic_mat(hrtf_mat)
+    dataset = load_cipic_mat(
+        hrtf_mat,
+        target_sample_rate=audio_buffer.sample_rate,
+        source_sample_rate=hrtf_sample_rate,
+    )
     hrir_l, hrir_r, used = select_hrir(dataset, yaw, pitch)
 
     print("Using HRIR angles:", used)
@@ -51,10 +56,19 @@ def main():
     parser.add_argument("--pitch", type=float, default=0.0)
     parser.add_argument("--blocks", type=int, default=300)
     parser.add_argument("--block-sizes", default="1024,512,256,128")
+    parser.add_argument("--hrtf-sr", type=int, default=HRTF_SAMPLE_RATE)
     args = parser.parse_args()
 
     block_sizes = _parse_block_sizes(args.block_sizes)
-    benchmark(args.input, args.hrtf, args.yaw, args.pitch, args.blocks, block_sizes)
+    benchmark(
+        args.input,
+        args.hrtf,
+        args.yaw,
+        args.pitch,
+        args.blocks,
+        block_sizes,
+        hrtf_sample_rate=args.hrtf_sr,
+    )
 
 
 if __name__ == "__main__":

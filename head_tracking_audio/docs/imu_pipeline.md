@@ -1,26 +1,26 @@
-# IMU Pipeline
+# Pipeline IMU
 
-## Sampling
-- MPU6050 sampled at 200 Hz by timer tick (timer_if).
-- imu_task_update reads raw accel/gyro.
+## Lấy mẫu
+- MPU6050 lấy mẫu 200 Hz bằng timer tick (timer_if).
+- imu_task_update đọc accel/gyro thô.
 
-## Calibration
-- orientation_task_init averages 500 gyro samples to estimate bias.
-- Bias is subtracted before conversion.
+## Hiệu chuẩn
+- orientation_task_init lấy trung bình 500 mẫu gyro để ước lượng bias.
+- Bias được trừ trước khi đổi đơn vị.
 
-## Unit conversion
+## Chuyển đổi đơn vị
 - Accelerometer: +/-4g => raw / 8192
-- Gyro: +/-500 dps => (raw - bias) / 65.5, then deg to rad
+- Gyro: +/-500 dps => (raw - bias) / 65.5, sau đó đổi từ độ sang rad
 
-## Madgwick update
-- Madgwick_UpdateIMU with dt=0.005 s.
-- Quaternion normalized internally.
+## Cập nhật Madgwick
+- Madgwick_UpdateIMU với dt=0.005 s.
+- Quaternion được chuẩn hóa nội bộ.
 
 ## Streaming
-- stream_task_send_quaternion formats ASCII CSV:
+- stream_task_send_quaternion format ASCII CSV:
   qw,qx,qy,qz,timestamp_ms\n
-- timestamp_ms from HAL_GetTick().
+- timestamp_ms lấy từ HAL_GetTick().
 
-## Host consumption
-- SerialReader reads lines and pushes (qw,qx,qy,qz,timestamp,host_time) into queue.
-- OrientationWorker smooths quaternion (NLERP) and triggers HRTF updates.
+## Host xử lý
+- SerialReader đọc dòng và đẩy (qw,qx,qy,qz,timestamp,host_time) vào queue.
+- OrientationWorker làm mượt quaternion (NLERP) và kích hoạt cập nhật HRTF.

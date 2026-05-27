@@ -96,6 +96,11 @@ def _quat_to_matrix(q):
 
 
 def _smooth_quat(prev, curr, smoothing):
+	prev = _normalize_quat(prev)
+	curr = _normalize_quat(curr)
+	dot = prev[0] * curr[0] + prev[1] * curr[1] + prev[2] * curr[2] + prev[3] * curr[3]
+	if dot < 0.0:
+		curr = (-curr[0], -curr[1], -curr[2], -curr[3])
 	qw = (1.0 - smoothing) * prev[0] + smoothing * curr[0]
 	qx = (1.0 - smoothing) * prev[1] + smoothing * curr[1]
 	qy = (1.0 - smoothing) * prev[2] + smoothing * curr[2]

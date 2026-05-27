@@ -15,6 +15,7 @@ from python_host.config.audio_config import (
     BLOCK_SIZE,
     QUEUE_SIZE,
     HRTF_UPDATE_HZ,
+    HRTF_SAMPLE_RATE,
     QUAT_SMOOTHING,
     HRTF_INTERPOLATE,
     HRTF_INTERP_STEP,
@@ -50,6 +51,11 @@ def _quat_to_euler(q):
 
 
 def _smooth_quat(prev, curr, alpha):
+    prev = _normalize_quat(prev)
+    curr = _normalize_quat(curr)
+    dot = prev[0] * curr[0] + prev[1] * curr[1] + prev[2] * curr[2] + prev[3] * curr[3]
+    if dot < 0.0:
+        curr = (-curr[0], -curr[1], -curr[2], -curr[3])
     qw = (1.0 - alpha) * prev[0] + alpha * curr[0]
     qx = (1.0 - alpha) * prev[1] + alpha * curr[1]
     qy = (1.0 - alpha) * prev[2] + alpha * curr[2]
@@ -156,7 +162,11 @@ def run_realtime_spatializer(args):
     audio_buffer = AudioFileBuffer.from_wav(args.input, target_sample_rate=args.sample_rate)
     sample_rate = audio_buffer.sample_rate
 
-    dataset = load_cipic_mat(args.hrtf)
+    dataset = load_cipic_mat(
+        args.hrtf,
+        target_sample_rate=sample_rate,
+        source_sample_rate=args.hrtf_sr,
+    )
 
     convolver_ref = ConvolverRef()
     hrtf_updater = HrtfUpdater(
@@ -236,6 +246,7 @@ def main():
     parser.add_argument("--block-size", type=int, default=BLOCK_SIZE)
     parser.add_argument("--queue-size", type=int, default=QUEUE_SIZE)
     parser.add_argument("--sample-rate", type=int, default=None)
+    parser.add_argument("--hrtf-sr", type=int, default=HRTF_SAMPLE_RATE)
     parser.add_argument("--smoothing", type=float, default=QUAT_SMOOTHING)
     parser.add_argument("--hrtf-update-hz", type=int, default=HRTF_UPDATE_HZ)
     parser.add_argument("--interpolate", action="store_true", default=HRTF_INTERPOLATE)
