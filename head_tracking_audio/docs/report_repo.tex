@@ -1,628 +1,628 @@
-\documentclass[12pt,a4paper,oneside]{report}
-\usepackage[T5]{fontenc}
-\usepackage[utf8]{inputenc}
-\usepackage[vietnamese]{babel}
-\usepackage{amsmath,amssymb,amsfonts}
-\usepackage{mathrsfs}
-\usepackage{graphicx}
-\usepackage{booktabs}
-\usepackage{listings}
-\usepackage{xcolor}
-\usepackage{geometry}
-\usepackage{tikz}
-\usepackage{algorithm}
-\usepackage{algpseudocode}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning}
-\usepackage{url}
-\usepackage{hyperref}
-
-\geometry{
-    a4paper,
-    top=25mm,
-    bottom=25mm,
-    left=30mm,
-    right=20mm
-}
-
-% Màu và cấu hình listings
-\definecolor{codegreen}{rgb}{0,0.6,0}
-\definecolor{codegray}{rgb}{0.5,0.5,0.5}
-\definecolor{codepurple}{rgb}{0.58,0,0.82}
-\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
-
-\lstdefinestyle{pythonstyle}{
-    backgroundcolor=\color{backcolour},
-    commentstyle=\color{codegreen},
-    keywordstyle=\color{blue},
-    numberstyle=\tiny\color{codegray},
-    stringstyle=\color{codepurple},
-    basicstyle=\ttfamily\footnotesize,
-    breakatwhitespace=false,
-    breaklines=true,
-    captionpos=b,
-    keepspaces=true,
-    numbers=left,
-    numbersep=5pt,
-    showspaces=false,
-    showstringspaces=false,
-    showtabs=false,
-    tabsize=4,
-    language=Python
-}
-
-\lstdefinestyle{cppstyle}{
-    backgroundcolor=\color{backcolour},
-    commentstyle=\color{codegreen},
-    keywordstyle=\color{blue},
-    numberstyle=\tiny\color{codegray},
-    stringstyle=\color{codepurple},
-    basicstyle=\ttfamily\footnotesize,
-    breakatwhitespace=false,
-    breaklines=true,
-    captionpos=b,
-    keepspaces=true,
-    numbers=left,
-    numbersep=5pt,
-    showspaces=false,
-    showstringspaces=false,
-    showtabs=false,
-    tabsize=4,
-    language=C++
-}
-
-\hypersetup{
-    colorlinks=true,
-    linkcolor=blue,
-    filecolor=magenta,
-    urlcolor=cyan,
-    pdftitle={Bao cao He thong Spatial Audio Head Tracking}
-}
-
-\begin{document}
-
-% ------------------ TRANG TIEU DE ------------------
-\begin{titlepage}
-    \begin{center}
-        \vspace*{1cm}
-
-        \large\textbf{TRUONG DAI HOC BACH KHOA}\\
-        \large\textbf{VIEN DIEN TU - VIEN THONG}
-
-        \vfill
-
-        \Large\textbf{BAO CAO DO AN CHUYEN SAU}
-
-        \vspace{1cm}
-
-        \huge\textbf{HE THONG AM THANH KHONG GIAN THOI GIAN THUC TICH HOP HEAD TRACKING}
-
-        \vfill
-
-        \begin{table}[h]
-            \centering
-            \begin{tabular}{ll}
-                \textbf{Sinh vien thuc hien:} & Le Ngoc Anh \\
-                \textbf{Ma so sinh vien:}     & 24020381 \\
-                \textbf{Lop:}                & ELT2041\_61 \\
-                \textbf{Giang vien huong dan:}& TS. Nguyen Kiem Hung \\
-            \end{tabular}
-        \end{table}
-
-        \vfill
-
-        \large Ha Noi, Nam 2026
-    \end{center}
-\end{titlepage}
-
-\tableofcontents
-\newpage
-
-% ------------------ CHUONG 1 ------------------
-\chapter{Tong Quan He Thong va Muc Tieu}
-
-\section{Muc tieu ky thuat}
-He thong duoc thiet ke theo mo hinh head-tracked spatial audio, trong do IMU tren vi dieu khien tao quaternion huong nhin va truyen sang may chu qua UART. Tren host, quaternion duoc lam muot, chon bo loc HRIR tu CSDL HRTF, sau do thuc thi tich chap FFT theo block va phat ra tai nghe theo thoi gian thuc.
-
-\section{Kien truc tong the}
-He thong chia thanh 2 khoi chinh:
-\begin{itemize}
-    \item \textbf{Embedded (STM32 + MPU6050):} doc cam bien 200 Hz, thuc thi Madgwick IMU fusion, stream quaternion qua UART.
-    \item \textbf{Python host:} doc serial, cap nhat bo loc HRTF theo huong nhin, thuc thi overlap-add FFT convolution, output bang \texttt{sounddevice} (PortAudio) \cite{portaudio}.
-\end{itemize}
-
-\section{So do khoi va luong du lieu}
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    block/.style={rectangle, draw, fill=blue!10, text width=3.3cm, align=center, minimum height=1.2cm, rounded corners},
-    line/.style={draw, -{Latex[scale=1.2]}, thick},
-    node distance=1.6cm and 1.2cm
-]
-% Nodes
-\node [block] (imu) {\textbf{MPU6050}\\200 Hz Sampling};
-\node [block, right=of imu] (mcu) {\textbf{STM32}\\Madgwick Fusion};
-\node [block, right=of mcu] (uart) {\textbf{UART DMA}\\460800 baud};
-\node [block, below=of uart] (serial) {\textbf{Serial Thread}\\Quaternion Queue};
-\node [block, left=of serial] (worker) {\textbf{Orientation Worker}\\Smoothing + HRTF Update};
-\node [block, left=of worker] (hrtf) {\textbf{HRTF Selector}\\Nearest/Linear Azimuth};
-\node [block, above=of hrtf] (fft) {\textbf{Overlap-Add FFT}\\Block Convolution};
-\node [block, right=of fft] (out) {\textbf{Audio Output}\\sounddevice 48 kHz};
-
-% Paths
-\path [line] (imu) -- (mcu);
-\path [line] (mcu) -- (uart);
-\path [line] (uart) -- (serial);
-\path [line] (serial) -- (worker);
-\path [line] (worker) -- (hrtf);
-\path [line] (hrtf) -- (fft);
-\path [line] (fft) -- (out);
-\end{tikzpicture}
-\caption{Kien truc he thong theo repo \texttt{head\_tracking\_audio}.}
-\label{fig:block_diagram_repo}
-\end{figure}
-
-\newpage
-
-% ------------------ CHUONG 2 ------------------
-\chapter{Nen Tang Toan Hoc va DSP Thuc Te}
-
-\section{Sensor Fusion (Madgwick IMU)}
-Tren MCU, goc quay duoc cap nhat bang bo loc Madgwick IMU \cite{madgwick2011}. Thuat toan su dung gia toc ke de hieu chinh drift cua gyro va cap nhat quaternion theo buoc thoi gian $\Delta t = 0.005\,\text{s}$ (200 Hz). Quaternion duoc chuan hoa moi chu ky de dam bao tinh truc chuan cua phep quay.
-
-\subsection{Tien xu ly IMU va quy doi don vi}
-Du lieu thuan tu MPU6050 la gia tri raw (int16) va can duoc chuan hoa ve don vi vat ly.
-Voi thang do gia toc $\pm 4g$ va gyro $\pm 500\,\text{dps}$, ta co:
-\begin{equation}
-    a_{x,y,z} = \frac{\text{raw}_{a}}{8192},\quad
-    \omega_{x,y,z} = \frac{\text{raw}_{g} - b_g}{65.5} \cdot \frac{\pi}{180}
-\end{equation}
-Trong do $b_g$ la bias gyro duoc uoc luong trong pha calib, va he so quy doi dua ve rad/s phuc vu cap nhat quaternion.
-
-\subsection{Mo hinh cap nhat Madgwick}
-Madgwick IMU ket hop:
-\begin{itemize}
-    \item \textbf{Tich phan gyro} de du doan quaternion.
-    \item \textbf{Gradient descent} de dua truot vector gia toc ve thang hang truong trong goc quay.
-\end{itemize}
-Dang tong quat cua dao ham quaternion theo gyro:
-\begin{equation}
-    \boldsymbol{\omega}_q = [0,\ \omega_x,\ \omega_y,\ \omega_z]
-\end{equation}
-\begin{equation}
-    \dot{\mathbf{q}} = \frac{1}{2}\,\mathbf{q} \otimes \boldsymbol{\omega}_q
-\end{equation}
-Sau do bo sung thanh phan hieu chinh:
-\begin{equation}
-    \dot{\mathbf{q}}_{corr} = \dot{\mathbf{q}} - \beta \nabla f(\mathbf{q}, \mathbf{a})
-\end{equation}
-He so $\beta$ dieu chinh muc do tin tuong gia toc ke. Sau moi buoc, quaternion duoc chuan hoa:
-\begin{equation}
-    \mathbf{q} \leftarrow \frac{\mathbf{q}}{\lVert \mathbf{q} \rVert}
-\end{equation}
-
-\subsection{Lam muot quaternion tren host}
-Tren host, quaternion duoc lam muot bang NLERP (normalized linear interpolation) de giam rung goc nho:
-\begin{equation}
-    \mathbf{q}_{smooth} = \text{normalize}\big((1-\alpha)\,\mathbf{q}_{prev} + \alpha\,\mathbf{q}_{curr}\big)
-\end{equation}
-NLERP duoc chon thay vi SLERP do chi phi tinh toan thap hon va du muot cho cac thay doi goc nho trong realtime. Gia tri $\alpha$ (mac dinh 0.1) can bang giua do nhay va do on dinh. Viec chuan hoa giup giu quaternion nam tren mat cau don vi, giam sai lech huong nho.
-
-\subsection{Chuyen quaternion sang yaw/pitch}
-Quaternion giu trang thai quay ben trong nen tranh singularity. Euler yaw/pitch chi duoc su dung lam toa do tra cuu HRIR, khong tham gia cap nhat trang thai, do do rui ro gimbal lock khong tac dong den on dinh noi suy \cite{shoemake1985}.
-
-\section{Lua chon HRTF va noi suy}
-CSDL HRTF dang CIPIC duoc nap tren host \cite{cipic2001}. He thong chon HRIR theo goc yaw/pitch:
-\begin{itemize}
-    \item \textbf{Nearest:} chon tap HRIR gan nhat theo azimuth va elevation.
-    \item \textbf{Linear azimuth:} noi suy giua 2 azimuth gan nhat (tuy chon).
-\end{itemize}
-Khac voi phien ban MATLAB trong LaTeX cu, he thong khong su dung gain-weighted panning theo nhieu diem ma chi noi suy 1 chieu theo azimuth de giam chi phi cap nhat.
-
-\subsection{Mo hinh chon HRIR theo luoi goc}
-Voi mang goc $\{\theta_i\}$ va $\{\phi_j\}$ tu CSDL, ta tim chi so gan nhat:
-\begin{equation}
-    i^* = \arg\min_i |\theta_i - \theta|, \quad j^* = \arg\min_j |\phi_j - \phi|
-\end{equation}
-Trong che do noi suy 1 chieu theo azimuth, he thong tim 2 goc ke can $\theta_0, \theta_1$ va he so:
-\begin{equation}
-    \alpha = \frac{\theta - \theta_0}{\theta_1 - \theta_0}
-\end{equation}
-Sau do HRIR duoc noi suy tuyen tinh theo tung mau:
-\begin{equation}
-    h = (1-\alpha) h_0 + \alpha h_1
-\end{equation}
-Phuong phap nay chua thuc hien can chinh phase hoac do tre (delay alignment), vi vay co the gay spectral coloration nhe trong mot so huong; gioi han nay se duoc ghi nhan o phan Ket luan.
-
-
-\section{Block Convolution (Overlap-Add FFT)}
-Xu ly HRTF duoc thuc thi theo block voi overlap-add FFT convolution \cite{oppenheim2010}. Khi HRIR thay doi, FFT cua HRIR duoc tinh truoc va luu lai de giam chi phi trong callback am thanh. Do phuc tap giam tu $\mathcal{O}(NM)$ ve $\mathcal{O}(N\log N)$ cho moi block.
-
-\subsection{Cau truc overlap-add}
-Voi do dai block $L$ va do dai HRIR $M$, kich thuoc FFT duoc chon la:
-\begin{equation}
-    N = 2^{\lceil \log_2(L + M - 1) \rceil}
-\end{equation}
-Moi block $x[n]$ duoc zero-pad len $N$, nhan tren mien tan so voi $H(\omega)$, sau do IFFT de lay $y[n]$. Doan cuoi $N-L$ duoc luu vao buffer overlap va cong vao block tiep theo:
-\begin{equation}
-    y_k[n] = \text{IFFT}(\text{FFT}(x_k) \cdot H) + o_{k-1}
-\end{equation}
-Trong do $o_{k-1}$ la overlap tu block truoc. Co che nay giu do tre thap (bang kich thuoc block) va on dinh trong callback realtime.
-
-\subsection{Minh hoa overlap-add theo block}
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}
-    \draw (0,0) rectangle (4,1) node[midway]{\small block $k$};
-    \draw (4,0) rectangle (8,1) node[midway]{\small block $k+1$};
-    \draw[fill=blue!20] (0,0) rectangle (1.2,1);
-    \draw[fill=blue!20] (4,0) rectangle (5.2,1);
-    \draw[<->] (0,-0.4) -- node[below]{\small $L$} (4,-0.4);
-    \draw[<->] (0,1.2) -- node[above]{\small overlap} (1.2,1.2);
-\end{tikzpicture}
-\caption{Minh hoa overlap-add: phan overlap duoc cong vao dau block tiep theo.}
-\label{fig:overlap_add_blocks}
-\end{figure}
-
-\section{Ly thuyet he thong repo dang su dung}
-De tranh nham lan voi ly thuyet cu, phan nay tong hop va phan tich cac khoi thuc te dang duoc su dung trong repo.
-
-\subsection{Protocol quaternion va dong bo thoi gian}
-Khung du lieu serial co dang:
-\begin{equation}
-    q_w, q_x, q_y, q_z, t_{dev}\;\;\text{(ms)}
-\end{equation}
-Host doc tung dong, parse va dua vao hang doi. Khi hang doi day, mau cu bi loai bo de uu tien trang thai moi (last-value wins), giup giam do tre tich luy. Co che nay phu hop voi bai toan head-tracking vi tinh ``cap nhat huong moi nhat'' quan trong hon viec giu day du chuoi mau.
-
-\subsection{Chuan hoa quaternion va chuyen doi Euler}
-Quaternion duoc chuan hoa de dam bao nam tren mat cau don vi:
-\begin{equation}
-    \mathbf{q} \leftarrow \frac{\mathbf{q}}{\lVert \mathbf{q} \rVert}
-\end{equation}
-Yaw/pitch duoc suy ra tu quaternion (ZYX) de tra cuu HRIR:
-\begin{align}
-    \text{roll} &= \operatorname{atan2}\big(2(w x + y z),\; 1 - 2(x^2 + y^2)\big) \\
-    \text{pitch} &= \arcsin\big(2(w y - z x)\big) \\
-    \text{yaw} &= \operatorname{atan2}\big(2(w z + x y),\; 1 - 2(y^2 + z^2)\big)
-\end{align}
-Euler chi dung cho indexing HRTF, con trang thai quay van duoc giu o dang quaternion \cite{shoemake1985}.
-
-\subsection{NLERP smoothing va chu ky cap nhat}
-De giam rung goc nho, quaternion duoc lam muot bang NLERP:
-\begin{equation}
-    \mathbf{q}_{smooth} = \text{normalize}\big((1-\alpha)\mathbf{q}_{prev} + \alpha\mathbf{q}_{curr}\big)
-\end{equation}
-Chu ky cap nhat HRTF $T_{update} = 1/f_{update}$ (mac dinh 50 Hz) giu cho viec doi bo loc theo huong nhin khong lam tang tai callback am thanh.
-
-\subsection{HRTF selection tu CIPIC}
-HRTF duoc nap tu CIPIC \cite{cipic2001}. Repo chon HRIR theo yaw/pitch bang cach tim goc gan nhat theo elevation va:
-\begin{itemize}
-    \item \textbf{Nearest:} chon goc azimuth gan nhat.
-    \item \textbf{Linear azimuth:} tim hai goc ke can va noi suy theo he so $\alpha$.
-\end{itemize}
-Trong che do noi suy, danh sach azimuth duoc sap xep tang dan, sau do tim $\theta_0, \theta_1$ va noi suy mau HRIR theo:
-\begin{equation}
-    h = (1-\alpha) h_0 + \alpha h_1
-\end{equation}
-
-\subsection{Overlap-add FFT trong callback}
-Repo dung overlap-add FFT convolution \cite{oppenheim2010}. Kich thuoc FFT:
-\begin{equation}
-    N = 2^{\lceil \log_2(L + M - 1) \rceil}
-\end{equation}
-FFT cua HRIR duoc tien tinh, moi block chi can FFT input, nhan phan tu, va IFFT. Phan overlap (do dai $N-L$) duoc luu va cong vao block tiep theo de dam bao tinh lien tuc.
-
-\subsection{Quan ly buffer am thanh va resampling}
-Audio dau vao duoc doc tu file, gop ve mono (trung binh hai kenh). Neu sample rate khac muc tieu, repo su dung resample polyphase de dua ve $F_s$ mong muon, giup dong bo voi block size va thoi gian callback.
-
-\subsection{Mo hinh luong va tach thread}
-Serial thread chi lam viec I/O va day queue; orientation worker lam muot quaternion va cap nhat HRIR; audio callback chi thuc thi convolution va output. Cach tach luong nay giu callback ``non-blocking'' va on dinh thoi gian thuc.
-
-\newpage
-
-% ------------------ CHUONG 3 ------------------
-\chapter{Thiet Ke Thoi Gian Thuc}
-
-\section{Thong so he thong}
-Cac thong so chinh theo repo:
-\begin{itemize}
-    \item IMU: 200 Hz
-    \item UART: 460800 baud
-    \item Audio: 48 kHz, block size 256
-    \item HRTF update: 50 Hz
-    \item Target perceptual latency: nominally 20--40 ms under stable conditions; co the cao hon tuy OS/driver
-\end{itemize}
-
-\section{Dong bo timestamp va do tre UART}
-MCU gui quaternion kem timestamp $t_{dev}$ (ms). Khi host nhan du lieu o thoi diem $t_{host}$, do lech dong ho duoc uoc luong boi bo loc EMA:
-\begin{equation}
-    \hat{\Delta} \leftarrow (1-\lambda)\,\hat{\Delta} + \lambda\,(t_{host} - t_{dev})
-\end{equation}
-Tu do, do tre UART uoc tinh:
-\begin{equation}
-    d_{uart} = t_{host} - (t_{dev} + \hat{\Delta})
-\end{equation}
-Gia tri nay phan anh tre duong truyen va jitter serial. Song song, do tre trong hang doi (queue age) duoc do boi:
-\begin{equation}
-    d_{queue} = t_{consume} - t_{host}
-\end{equation}
-Hai dai luong tren duoc thu thap de danh gia su on dinh cua duong truyen IMU -> host.
-
-\section{Mo hinh do tre end-to-end}
-Tong do tre tu luc IMU cap nhat den khi am thanh ra DAC co the xap xi:
-\begin{equation}
-    T_{e2e} = d_{uart} + d_{queue} + T_{update} + T_{proc} + T_{buffer} + T_{dac}
-\end{equation}
-Trong do:
-\begin{itemize}
-    \item $T_{update} \approx 1 / f_{update}$ la chu ky cap nhat HRTF (50 Hz -> 20 ms).
-    \item $T_{proc}$ la thoi gian convolution trong callback.
-    \item $T_{buffer} = L / F_s$ la do tre do block audio.
-    \item $T_{dac}$ la do tre phan cung (phu thuoc driver).
-\end{itemize}
-Do tre cam nhan thuc te thuong la gia tri lon nhat theo thoi diem cap nhat (worst-case), do do tan so cap nhat HRTF co vai tro quan trong. Do tre ``staleness'' cua huong nhin co the nam trong:
-\begin{equation}
-    T_{stale} \in \big[0,\, 1/f_{update}\big]
-\end{equation}
-
-\section{Headroom callback va gioi han thoi gian}
-Dieu kien on dinh realtime:
-\begin{equation}
-    T_{proc} < T_{buffer}
-\end{equation}
-Dinh nghia headroom:
-\begin{equation}
-    H = T_{buffer} - T_{proc}
-\end{equation}
-Neu $H < 0$, he thong se xuat hien underrun. Mot tien ich monitoring thu thap thoi gian callback va so lan overrun de dieu chinh $L$ hoac toi uu FFT.
-
-\section{On dinh so hoc va bien do}
-FFT convolution su dung float32. De tranh clipping tai output, tin hieu nen duoc dam bao nam trong khoang $[-1, 1]$ bang gain co dinh hoac limiter don gian truoc khi xuat ra driver.
-
-\section{Minh hoa thoi gian va dong bo}
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[>=Latex]
-    \draw[->] (0,0) -- (10,0) node[right]{time};
-    \draw[fill=black] (1,0) circle (0.04) node[above]{\small $t_{dev}$};
-    \draw[fill=black] (5,0) circle (0.04) node[above]{\small $t_{host}$};
-    \draw[fill=black] (7.5,0) circle (0.04) node[above]{\small $t_{consume}$};
-    \draw[<->] (1,-0.6) -- node[below]{\small $d_{uart}$} (5,-0.6);
-    \draw[<->] (5,-1.2) -- node[below]{\small $d_{queue}$} (7.5,-1.2);
-\end{tikzpicture}
-\caption{Minh hoa dong bo timestamp va do tre UART/queue.}
-\label{fig:timing_uart_queue}
-\end{figure}
-
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}
-    \draw (0,0) rectangle (8,1);
-    \draw[fill=blue!20] (0,0) rectangle (3,1);
-    \draw[<->] (0,-0.4) -- node[below]{\small $T_{proc}$} (3,-0.4);
-    \draw[<->] (3,-0.4) -- node[below]{\small $H$} (8,-0.4);
-    \node at (4,0.5) {\small $T_{buffer}$};
-\end{tikzpicture}
-\caption{Minh hoa headroom callback so voi $T_{buffer}$.}
-\label{fig:callback_headroom}
-\end{figure}
-
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}
-    \draw[->] (0,0) -- (8,0) node[right]{freq};
-    \draw[->] (0,0) -- (0,3) node[above]{mag};
-    \draw[thick] plot coordinates {
-        (0.3,0.4) (0.8,0.9) (1.5,1.6) (2.2,2.4)
-        (3.0,1.8) (3.8,1.0) (4.6,1.7) (5.4,2.2)
-        (6.2,1.4) (7.2,1.1)
-    };
-    \draw[dashed] (3.8,0) -- (3.8,1.0);
-    \node[below] at (3.8,0) {\small notch};
-\end{tikzpicture}
-\caption{Dang dap ung tan so HRIR (minh hoa dinh tinh).}
-\label{fig:hrir_response}
-\end{figure}
-
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}
-    \draw[->] (0,0) -- (8,0) node[right]{time};
-    \draw[->] (0,0) -- (0,3) node[above]{queue depth};
-    \draw[thick] (0,0) -- (1,0) -- (1,1) -- (2,1) -- (2,2) -- (3,2) -- (3,1)
-                 -- (4,1) -- (4,2) -- (5,2) -- (5,3) -- (6,3) -- (6,1) -- (7,1) -- (7,0) -- (8,0);
-    \node[right] at (6,2.8) {\small backlog};
-\end{tikzpicture}
-\caption{Minh hoa dao dong queue khi toc do UART va worker khac nhau.}
-\label{fig:queue_occupancy}
-\end{figure}
-
-\section{Do thi do luong (minh hoa)}
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}
-    \draw[->] (0,0) -- (8,0) node[right]{time};
-    \draw[->] (0,0) -- (0,3) node[above]{ms};
-    \draw[thick] plot coordinates {
-        (0.5,0.9) (1.2,1.1) (2.0,0.8) (2.8,1.6)
-        (3.6,1.0) (4.5,1.2) (5.2,0.9) (6.0,1.4) (7.2,1.0)
-    };
-    \draw[dashed] (0,1.5) -- (8,1.5) node[right]{\small budget};
-\end{tikzpicture}
-\caption{Thoi gian xu ly callback theo thoi gian (minh hoa).}
-\label{fig:callback_timing_plot}
-\end{figure}
-
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}
-    \draw[->] (0,0) -- (8,0) node[right]{time};
-    \draw[->] (0,0) -- (0,3) node[above]{yaw (deg)};
-    \draw[dashed] (0,2.5) -- (8,2.5) node[right]{\small target};
-    \draw[thick] plot coordinates {
-        (0.5,0.3) (1.2,0.8) (2.0,1.4) (3.0,2.0)
-        (4.0,2.2) (5.0,2.35) (6.0,2.45) (7.2,2.5)
-    };
-\end{tikzpicture}
-\caption{Dap ung yaw theo thoi gian (minh hoa).}
-\label{fig:yaw_response_plot}
-\end{figure}
-
-\section{Rang buoc thoi gian}
-Voi $F_s = 48000\,\text{Hz}$ va $L = 256$:
-\begin{equation}
-    T_{buffer} = \frac{256}{48000} \approx 5.33\,\text{ms}
-\end{equation}
-Toan bo pipeline (convolution + output callback) phai hoan tat trong khoang thoi gian nay de tranh underrun.
-
-\section{Mo hinh luong (threads)}
-\begin{itemize}
-    \item \textbf{Serial thread:} doc UART, parse quaternion, dua vao queue.
-    \item \textbf{Orientation worker:} lay queue, lam muot quaternion, cap nhat HRIR/FFT.
-    \item \textbf{Audio callback:} doc block audio, convolution, ghi ra output (khong duoc block).
-\end{itemize}
-
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[
-    box/.style={rectangle, draw, rounded corners, align=center, minimum height=0.9cm},
-    line/.style={draw, -{Latex[scale=1.1]}, thick}
-]
-\node[box] (serial) {Serial Thread};
-\node[box, right=1.8cm of serial] (queue) {Queue};
-\node[box, right=1.8cm of queue] (worker) {Orientation Worker};
-\node[box, below=1.2cm of worker] (atomic) {Atomic Convolver Ref};
-\node[box, left=1.8cm of atomic] (audio) {Audio Callback};
-
-\path[line] (serial) -- (queue);
-\path[line] (queue) -- (worker);
-\path[line] (worker) -- (atomic);
-\path[line] (atomic) -- (audio);
-\end{tikzpicture}
-\caption{So do dong bo thread va con trieu bo loc.}
-\label{fig:thread_sync}
-\end{figure}
-
-\section{Thuat toan block realtime}
-\begin{algorithm}[H]
-\caption{Realtime Spatial Audio (Repo)}
-\label{alg:repo_pipeline}
-\begin{algorithmic}[1]
-\State Init audio buffer, load CIPIC HRTF
-\State Start Serial thread and Orientation worker
-\While{Audio stream active}
-    \State Read mono block $x$ (size $L$)
-    \State Fetch current convolver (HRIR FFT precomputed)
-    \State $y_L, y_R \gets \text{OverlapAddConvolution}(x, h_{L,R})$
-    \State Output $(y_L, y_R)$ via sounddevice
-\EndWhile
-\end{algorithmic}
-\end{algorithm}
-
-\newpage
-
-% ------------------ CHUONG 4 ------------------
-\chapter{Danh Gia He Thong}
-
-\section{Thoi gian callback va headroom}
-Thong so callback duoc do trong qua trinh chay thuc te. Bang sau la mau thong ke de cap nhat:
-\begin{table}[htbp]
-\centering
-\caption{Thong ke thoi gian callback theo kich thuoc block (can cap nhat).}
-\label{tab:callback_stats}
-\begin{tabular}{lcccc}
-\toprule
-Block size & FFT size & Avg (ms) & Peak (ms) & Overrun count \\
-\midrule
-128 & -- & -- & -- & -- \\
-256 & -- & -- & -- & -- \\
-512 & -- & -- & -- & -- \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\section{UART jitter va queue age}
-Do tre UART va queue age duoc theo doi theo thoi gian. Cac tri so trung binh/do lech chuan nen duoc cap nhat tu log:
-\begin{table}[htbp]
-\centering
-\caption{Thong ke UART jitter va queue age (can cap nhat).}
-\label{tab:uart_jitter}
-\begin{tabular}{lcc}
-\toprule
-Metric & Avg (ms) & Std (ms) \\
-\midrule
-UART delay & -- & -- \\
-Queue age & -- & -- \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\section{Orientation drift}
-Dat IMU o trang thai co dinh trong 5 phut, ghi lai yaw va tinh drift (deg/min). Do drift nang se danh gia nhu mot gioi han he thong.
-
-\section{Danh gia chu quan}
-Thuc hien nghe thu voi cac thao tac quay dau trai/phai va tien/lui. Ghi nhan:
-\begin{itemize}
-    \item Do on dinh vi tri nguon am khi xoay dau.
-    \item Kha nang phan biet truoc/sau (front-back confusion).
-    \item Muc do tu nhien cua khong gian (subjective spatial impression).
-\end{itemize}
-
-\newpage
-
-% ------------------ CHUONG 5 ------------------
-\chapter{So sanh voi mo ta LaTeX cu}
-
-\section{Phan giong nhau}
-\begin{itemize}
-    \item Kien truc end-to-end IMU -> UART -> host -> HRTF -> convolution -> output.
-    \item Xu ly theo block va co rang buoc thoi gian thuc.
-    \item Su dung quaternion de bieu dien huong nhin.
-\end{itemize}
-
-\section{Phan khac biet}
-\begin{itemize}
-    \item Fusion chay tren MCU (Madgwick), khong phai MATLAB complementary filter.
-    \item Convolution da chuyen sang overlap-add FFT, khong con FIR time-domain.
-    \item Sample rate 48 kHz (khong phai 44.1 kHz).
-    \item Khong co LR4 crossover va soft clipping trong pipeline hien tai.
-    \item Audio driver dung \texttt{sounddevice}, khong su dung ASIO.
-\end{itemize}
-
-\newpage
-
-% ------------------ CHUONG 6 ------------------
-\chapter{Ket luan va huong mo rong}
-
-\section{Gioi han hien tai}
-\begin{itemize}
-    \item Yaw drift do khong co magnetometer.
-    \item HRTF interpolation dang o muc don gian (nearest/linear).
-    \item Hieu nang phu thuoc vao callback audio va kich thuoc block.
-    \item HRTF ca nhan hoa chua duoc ho tro; CIPIC chung co the gay sai lech localization giua cac nguoi dung.
-\end{itemize}
-
-\section{Huong phat trien}
-\begin{itemize}
-    \item Them magnetometer va bo loc EKF de giam drift.
-    \item Noisuy HRTF nang cao (minimum-phase, time-aligned).
-    \item Tang toc convolution (GPU hoac SIMD) va toi uu buffer.
-\end{itemize}
-
-\begin{thebibliography}{9}
-\bibitem{madgwick2011}
-S. O. H. Madgwick, ``An efficient orientation filter for inertial and inertial/magnetic sensor arrays,'' 2011.
-
-\bibitem{cipic2001}
-V. R. Algazi, R. O. Duda, D. M. Thompson, and C. Avendano, ``The CIPIC HRTF database,'' 2001.
-
-\bibitem{oppenheim2010}
-A. V. Oppenheim and R. W. Schafer, \textit{Discrete-Time Signal Processing}, 3rd ed., 2010.
-
-\bibitem{shoemake1985}
-K. Shoemake, ``Animating rotation with quaternion curves,'' 1985.
-
-\bibitem{portaudio}
-PortAudio, ``Portable Real-Time Audio Library.'' [Online]. Available: \url{https://www.portaudio.com/}
-\end{thebibliography}
-
-\end{document}
+    \documentclass[12pt,a4paper,oneside]{report}
+    \usepackage[T5]{fontenc}
+    \usepackage[utf8]{inputenc}
+    \usepackage[vietnamese]{babel}
+    \usepackage{amsmath,amssymb,amsfonts}
+    \usepackage{mathrsfs}
+    \usepackage{graphicx}
+    \usepackage{booktabs}
+    \usepackage{listings}
+    \usepackage{xcolor}
+    \usepackage{geometry}
+    \usepackage{tikz}
+    \usepackage{algorithm}
+    \usepackage{algpseudocode}
+    \usetikzlibrary{shapes.geometric, arrows.meta, positioning}
+    \usepackage{url}
+    \usepackage{hyperref}
+
+    \geometry{
+        a4paper,
+        top=25mm,
+        bottom=25mm,
+        left=30mm,
+        right=20mm
+    }
+
+    % Màu và cấu hình listings
+    \definecolor{codegreen}{rgb}{0,0.6,0}
+    \definecolor{codegray}{rgb}{0.5,0.5,0.5}
+    \definecolor{codepurple}{rgb}{0.58,0,0.82}
+    \definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+    \lstdefinestyle{pythonstyle}{
+        backgroundcolor=\color{backcolour},
+        commentstyle=\color{codegreen},
+        keywordstyle=\color{blue},
+        numberstyle=\tiny\color{codegray},
+        stringstyle=\color{codepurple},
+        basicstyle=\ttfamily\footnotesize,
+        breakatwhitespace=false,
+        breaklines=true,
+        captionpos=b,
+        keepspaces=true,
+        numbers=left,
+        numbersep=5pt,
+        showspaces=false,
+        showstringspaces=false,
+        showtabs=false,
+        tabsize=4,
+        language=Python
+    }
+
+    \lstdefinestyle{cppstyle}{
+        backgroundcolor=\color{backcolour},
+        commentstyle=\color{codegreen},
+        keywordstyle=\color{blue},
+        numberstyle=\tiny\color{codegray},
+        stringstyle=\color{codepurple},
+        basicstyle=\ttfamily\footnotesize,
+        breakatwhitespace=false,
+        breaklines=true,
+        captionpos=b,
+        keepspaces=true,
+        numbers=left,
+        numbersep=5pt,
+        showspaces=false,
+        showstringspaces=false,
+        showtabs=false,
+        tabsize=4,
+        language=C++
+    }
+
+    \hypersetup{
+        colorlinks=true,
+        linkcolor=blue,
+        filecolor=magenta,
+        urlcolor=cyan,
+        pdftitle={Bao cao He thong Spatial Audio Head Tracking}
+    }
+
+    \begin{document}
+
+    % ------------------ TRANG TIEU DE ------------------
+    \begin{titlepage}
+        \begin{center}
+            \vspace*{1cm}
+
+            \large\textbf{TRUONG DAI HOC BACH KHOA}\\
+            \large\textbf{VIEN DIEN TU - VIEN THONG}
+
+            \vfill
+
+            \Large\textbf{BAO CAO DO AN CHUYEN SAU}
+
+            \vspace{1cm}
+
+            \huge\textbf{HE THONG AM THANH KHONG GIAN THOI GIAN THUC TICH HOP HEAD TRACKING}
+
+            \vfill
+
+            \begin{table}[h]
+                \centering
+                \begin{tabular}{ll}
+                    \textbf{Sinh vien thuc hien:} & Le Ngoc Anh \\
+                    \textbf{Ma so sinh vien:}     & 24020381 \\
+                    \textbf{Lop:}                & ELT2041\_61 \\
+                    \textbf{Giang vien huong dan:}& TS. Nguyen Kiem Hung \\
+                \end{tabular}
+            \end{table}
+
+            \vfill
+
+            \large Ha Noi, Nam 2026
+        \end{center}
+    \end{titlepage}
+
+    \tableofcontents
+    \newpage
+
+    % ------------------ CHUONG 1 ------------------
+    \chapter{Tong Quan He Thong va Muc Tieu}
+
+    \section{Muc tieu ky thuat}
+    He thong duoc thiet ke theo mo hinh head-tracked spatial audio, trong do IMU tren vi dieu khien tao quaternion huong nhin va truyen sang may chu qua UART. Tren host, quaternion duoc lam muot, chon bo loc HRIR tu CSDL HRTF, sau do thuc thi tich chap FFT theo block va phat ra tai nghe theo thoi gian thuc.
+
+    \section{Kien truc tong the}
+    He thong chia thanh 2 khoi chinh:
+    \begin{itemize}
+        \item \textbf{Embedded (STM32 + MPU6050):} doc cam bien 200 Hz, thuc thi Madgwick IMU fusion, stream quaternion qua UART.
+        \item \textbf{Python host:} doc serial, cap nhat bo loc HRTF theo huong nhin, thuc thi overlap-add FFT convolution, output bang \texttt{sounddevice} (PortAudio) \cite{portaudio}.
+    \end{itemize}
+
+    \section{So do khoi va luong du lieu}
+    \begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        block/.style={rectangle, draw, fill=blue!10, text width=3.3cm, align=center, minimum height=1.2cm, rounded corners},
+        line/.style={draw, -{Latex[scale=1.2]}, thick},
+        node distance=1.6cm and 1.2cm
+    ]
+    % Nodes
+    \node [block] (imu) {\textbf{MPU6050}\\200 Hz Sampling};
+    \node [block, right=of imu] (mcu) {\textbf{STM32}\\Madgwick Fusion};
+    \node [block, right=of mcu] (uart) {\textbf{UART DMA}\\460800 baud};
+    \node [block, below=of uart] (serial) {\textbf{Serial Thread}\\Quaternion Queue};
+    \node [block, left=of serial] (worker) {\textbf{Orientation Worker}\\Smoothing + HRTF Update};
+    \node [block, left=of worker] (hrtf) {\textbf{HRTF Selector}\\Nearest/Linear Azimuth};
+    \node [block, above=of hrtf] (fft) {\textbf{Overlap-Add FFT}\\Block Convolution};
+    \node [block, right=of fft] (out) {\textbf{Audio Output}\\sounddevice 48 kHz};
+
+    % Paths
+    \path [line] (imu) -- (mcu);
+    \path [line] (mcu) -- (uart);
+    \path [line] (uart) -- (serial);
+    \path [line] (serial) -- (worker);
+    \path [line] (worker) -- (hrtf);
+    \path [line] (hrtf) -- (fft);
+    \path [line] (fft) -- (out);
+    \end{tikzpicture}
+    \caption{Kien truc he thong theo repo \texttt{head\_tracking\_audio}.}
+    \label{fig:block_diagram_repo}
+    \end{figure}
+
+    \newpage
+
+    % ------------------ CHUONG 2 ------------------
+    \chapter{Nen Tang Toan Hoc va DSP Thuc Te}
+
+    \section{Sensor Fusion (Madgwick IMU)}
+    Tren MCU, goc quay duoc cap nhat bang bo loc Madgwick IMU \cite{madgwick2011}. Thuat toan su dung gia toc ke de hieu chinh drift cua gyro va cap nhat quaternion theo buoc thoi gian $\Delta t = 0.005\,\text{s}$ (200 Hz). Quaternion duoc chuan hoa moi chu ky de dam bao tinh truc chuan cua phep quay.
+
+    \subsection{Tien xu ly IMU va quy doi don vi}
+    Du lieu thuan tu MPU6050 la gia tri raw (int16) va can duoc chuan hoa ve don vi vat ly.
+    Voi thang do gia toc $\pm 4g$ va gyro $\pm 500\,\text{dps}$, ta co:
+    \begin{equation}
+        a_{x,y,z} = \frac{\text{raw}_{a}}{8192},\quad
+        \omega_{x,y,z} = \frac{\text{raw}_{g} - b_g}{65.5} \cdot \frac{\pi}{180}
+    \end{equation}
+    Trong do $b_g$ la bias gyro duoc uoc luong trong pha calib, va he so quy doi dua ve rad/s phuc vu cap nhat quaternion.
+
+    \subsection{Mo hinh cap nhat Madgwick}
+    Madgwick IMU ket hop:
+    \begin{itemize}
+        \item \textbf{Tich phan gyro} de du doan quaternion.
+        \item \textbf{Gradient descent} de dua truot vector gia toc ve thang hang truong trong goc quay.
+    \end{itemize}
+    Dang tong quat cua dao ham quaternion theo gyro:
+    \begin{equation}
+        \boldsymbol{\omega}_q = [0,\ \omega_x,\ \omega_y,\ \omega_z]
+    \end{equation}
+    \begin{equation}
+        \dot{\mathbf{q}} = \frac{1}{2}\,\mathbf{q} \otimes \boldsymbol{\omega}_q
+    \end{equation}
+    Sau do bo sung thanh phan hieu chinh:
+    \begin{equation}
+        \dot{\mathbf{q}}_{corr} = \dot{\mathbf{q}} - \beta \nabla f(\mathbf{q}, \mathbf{a})
+    \end{equation}
+    He so $\beta$ dieu chinh muc do tin tuong gia toc ke. Sau moi buoc, quaternion duoc chuan hoa:
+    \begin{equation}
+        \mathbf{q} \leftarrow \frac{\mathbf{q}}{\lVert \mathbf{q} \rVert}
+    \end{equation}
+
+    \subsection{Lam muot quaternion tren host}
+    Tren host, quaternion duoc lam muot bang NLERP (normalized linear interpolation) de giam rung goc nho:
+    \begin{equation}
+        \mathbf{q}_{smooth} = \text{normalize}\big((1-\alpha)\,\mathbf{q}_{prev} + \alpha\,\mathbf{q}_{curr}\big)
+    \end{equation}
+    NLERP duoc chon thay vi SLERP do chi phi tinh toan thap hon va du muot cho cac thay doi goc nho trong realtime. Gia tri $\alpha$ (mac dinh 0.1) can bang giua do nhay va do on dinh. Viec chuan hoa giup giu quaternion nam tren mat cau don vi, giam sai lech huong nho.
+
+    \subsection{Chuyen quaternion sang yaw/pitch}
+    Quaternion giu trang thai quay ben trong nen tranh singularity. Euler yaw/pitch chi duoc su dung lam toa do tra cuu HRIR, khong tham gia cap nhat trang thai, do do rui ro gimbal lock khong tac dong den on dinh noi suy \cite{shoemake1985}.
+
+    \section{Lua chon HRTF va noi suy}
+    CSDL HRTF dang CIPIC duoc nap tren host \cite{cipic2001}. He thong chon HRIR theo goc yaw/pitch:
+    \begin{itemize}
+        \item \textbf{Nearest:} chon tap HRIR gan nhat theo azimuth va elevation.
+        \item \textbf{Linear azimuth:} noi suy giua 2 azimuth gan nhat (tuy chon).
+    \end{itemize}
+    Khac voi phien ban MATLAB trong LaTeX cu, he thong khong su dung gain-weighted panning theo nhieu diem ma chi noi suy 1 chieu theo azimuth de giam chi phi cap nhat.
+
+    \subsection{Mo hinh chon HRIR theo luoi goc}
+    Voi mang goc $\{\theta_i\}$ va $\{\phi_j\}$ tu CSDL, ta tim chi so gan nhat:
+    \begin{equation}
+        i^* = \arg\min_i |\theta_i - \theta|, \quad j^* = \arg\min_j |\phi_j - \phi|
+    \end{equation}
+    Trong che do noi suy 1 chieu theo azimuth, he thong tim 2 goc ke can $\theta_0, \theta_1$ va he so:
+    \begin{equation}
+        \alpha = \frac{\theta - \theta_0}{\theta_1 - \theta_0}
+    \end{equation}
+    Sau do HRIR duoc noi suy tuyen tinh theo tung mau:
+    \begin{equation}
+        h = (1-\alpha) h_0 + \alpha h_1
+    \end{equation}
+    Phuong phap nay chua thuc hien can chinh phase hoac do tre (delay alignment), vi vay co the gay spectral coloration nhe trong mot so huong; gioi han nay se duoc ghi nhan o phan Ket luan.
+
+
+    \section{Block Convolution (Overlap-Add FFT)}
+    Xu ly HRTF duoc thuc thi theo block voi overlap-add FFT convolution \cite{oppenheim2010}. Khi HRIR thay doi, FFT cua HRIR duoc tinh truoc va luu lai de giam chi phi trong callback am thanh. Do phuc tap giam tu $\mathcal{O}(NM)$ ve $\mathcal{O}(N\log N)$ cho moi block.
+
+    \subsection{Cau truc overlap-add}
+    Voi do dai block $L$ va do dai HRIR $M$, kich thuoc FFT duoc chon la:
+    \begin{equation}
+        N = 2^{\lceil \log_2(L + M - 1) \rceil}
+    \end{equation}
+    Moi block $x[n]$ duoc zero-pad len $N$, nhan tren mien tan so voi $H(\omega)$, sau do IFFT de lay $y[n]$. Doan cuoi $N-L$ duoc luu vao buffer overlap va cong vao block tiep theo:
+    \begin{equation}
+        y_k[n] = \text{IFFT}(\text{FFT}(x_k) \cdot H) + o_{k-1}
+    \end{equation}
+    Trong do $o_{k-1}$ la overlap tu block truoc. Co che nay giu do tre thap (bang kich thuoc block) va on dinh trong callback realtime.
+
+    \subsection{Minh hoa overlap-add theo block}
+    \begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}
+        \draw (0,0) rectangle (4,1) node[midway]{\small block $k$};
+        \draw (4,0) rectangle (8,1) node[midway]{\small block $k+1$};
+        \draw[fill=blue!20] (0,0) rectangle (1.2,1);
+        \draw[fill=blue!20] (4,0) rectangle (5.2,1);
+        \draw[<->] (0,-0.4) -- node[below]{\small $L$} (4,-0.4);
+        \draw[<->] (0,1.2) -- node[above]{\small overlap} (1.2,1.2);
+    \end{tikzpicture}
+    \caption{Minh hoa overlap-add: phan overlap duoc cong vao dau block tiep theo.}
+    \label{fig:overlap_add_blocks}
+    \end{figure}
+
+    \section{Ly thuyet he thong repo dang su dung}
+    De tranh nham lan voi ly thuyet cu, phan nay tong hop va phan tich cac khoi thuc te dang duoc su dung trong repo.
+
+    \subsection{Protocol quaternion va dong bo thoi gian}
+    Khung du lieu serial co dang:
+    \begin{equation}
+        q_w, q_x, q_y, q_z, t_{dev}\;\;\text{(ms)}
+    \end{equation}
+    Host doc tung dong, parse va dua vao hang doi. Khi hang doi day, mau cu bi loai bo de uu tien trang thai moi (last-value wins), giup giam do tre tich luy. Co che nay phu hop voi bai toan head-tracking vi tinh ``cap nhat huong moi nhat'' quan trong hon viec giu day du chuoi mau.
+
+    \subsection{Chuan hoa quaternion va chuyen doi Euler}
+    Quaternion duoc chuan hoa de dam bao nam tren mat cau don vi:
+    \begin{equation}
+        \mathbf{q} \leftarrow \frac{\mathbf{q}}{\lVert \mathbf{q} \rVert}
+    \end{equation}
+    Yaw/pitch duoc suy ra tu quaternion (ZYX) de tra cuu HRIR:
+    \begin{align}
+        \text{roll} &= \operatorname{atan2}\big(2(w x + y z),\; 1 - 2(x^2 + y^2)\big) \\
+        \text{pitch} &= \arcsin\big(2(w y - z x)\big) \\
+        \text{yaw} &= \operatorname{atan2}\big(2(w z + x y),\; 1 - 2(y^2 + z^2)\big)
+    \end{align}
+    Euler chi dung cho indexing HRTF, con trang thai quay van duoc giu o dang quaternion \cite{shoemake1985}.
+
+    \subsection{NLERP smoothing va chu ky cap nhat}
+    De giam rung goc nho, quaternion duoc lam muot bang NLERP:
+    \begin{equation}
+        \mathbf{q}_{smooth} = \text{normalize}\big((1-\alpha)\mathbf{q}_{prev} + \alpha\mathbf{q}_{curr}\big)
+    \end{equation}
+    Chu ky cap nhat HRTF $T_{update} = 1/f_{update}$ (mac dinh 50 Hz) giu cho viec doi bo loc theo huong nhin khong lam tang tai callback am thanh.
+
+    \subsection{HRTF selection tu CIPIC}
+    HRTF duoc nap tu CIPIC \cite{cipic2001}. Repo chon HRIR theo yaw/pitch bang cach tim goc gan nhat theo elevation va:
+    \begin{itemize}
+        \item \textbf{Nearest:} chon goc azimuth gan nhat.
+        \item \textbf{Linear azimuth:} tim hai goc ke can va noi suy theo he so $\alpha$.
+    \end{itemize}
+    Trong che do noi suy, danh sach azimuth duoc sap xep tang dan, sau do tim $\theta_0, \theta_1$ va noi suy mau HRIR theo:
+    \begin{equation}
+        h = (1-\alpha) h_0 + \alpha h_1
+    \end{equation}
+
+    \subsection{Overlap-add FFT trong callback}
+    Repo dung overlap-add FFT convolution \cite{oppenheim2010}. Kich thuoc FFT:
+    \begin{equation}
+        N = 2^{\lceil \log_2(L + M - 1) \rceil}
+    \end{equation}
+    FFT cua HRIR duoc tien tinh, moi block chi can FFT input, nhan phan tu, va IFFT. Phan overlap (do dai $N-L$) duoc luu va cong vao block tiep theo de dam bao tinh lien tuc.
+
+    \subsection{Quan ly buffer am thanh va resampling}
+    Audio dau vao duoc doc tu file, gop ve mono (trung binh hai kenh). Neu sample rate khac muc tieu, repo su dung resample polyphase de dua ve $F_s$ mong muon, giup dong bo voi block size va thoi gian callback.
+
+    \subsection{Mo hinh luong va tach thread}
+    Serial thread chi lam viec I/O va day queue; orientation worker lam muot quaternion va cap nhat HRIR; audio callback chi thuc thi convolution va output. Cach tach luong nay giu callback ``non-blocking'' va on dinh thoi gian thuc.
+
+    \newpage
+
+    % ------------------ CHUONG 3 ------------------
+    \chapter{Thiet Ke Thoi Gian Thuc}
+
+    \section{Thong so he thong}
+    Cac thong so chinh theo repo:
+    \begin{itemize}
+        \item IMU: 200 Hz
+        \item UART: 460800 baud
+        \item Audio: 48 kHz, block size 256
+        \item HRTF update: 50 Hz
+        \item Target perceptual latency: nominally 20--40 ms under stable conditions; co the cao hon tuy OS/driver
+    \end{itemize}
+
+    \section{Dong bo timestamp va do tre UART}
+    MCU gui quaternion kem timestamp $t_{dev}$ (ms). Khi host nhan du lieu o thoi diem $t_{host}$, do lech dong ho duoc uoc luong boi bo loc EMA:
+    \begin{equation}
+        \hat{\Delta} \leftarrow (1-\lambda)\,\hat{\Delta} + \lambda\,(t_{host} - t_{dev})
+    \end{equation}
+    Tu do, do tre UART uoc tinh:
+    \begin{equation}
+        d_{uart} = t_{host} - (t_{dev} + \hat{\Delta})
+    \end{equation}
+    Gia tri nay phan anh tre duong truyen va jitter serial. Song song, do tre trong hang doi (queue age) duoc do boi:
+    \begin{equation}
+        d_{queue} = t_{consume} - t_{host}
+    \end{equation}
+    Hai dai luong tren duoc thu thap de danh gia su on dinh cua duong truyen IMU -> host.
+
+    \section{Mo hinh do tre end-to-end}
+    Tong do tre tu luc IMU cap nhat den khi am thanh ra DAC co the xap xi:
+    \begin{equation}
+        T_{e2e} = d_{uart} + d_{queue} + T_{update} + T_{proc} + T_{buffer} + T_{dac}
+    \end{equation}
+    Trong do:
+    \begin{itemize}
+        \item $T_{update} \approx 1 / f_{update}$ la chu ky cap nhat HRTF (50 Hz -> 20 ms).
+        \item $T_{proc}$ la thoi gian convolution trong callback.
+        \item $T_{buffer} = L / F_s$ la do tre do block audio.
+        \item $T_{dac}$ la do tre phan cung (phu thuoc driver).
+    \end{itemize}
+    Do tre cam nhan thuc te thuong la gia tri lon nhat theo thoi diem cap nhat (worst-case), do do tan so cap nhat HRTF co vai tro quan trong. Do tre ``staleness'' cua huong nhin co the nam trong:
+    \begin{equation}
+        T_{stale} \in \big[0,\, 1/f_{update}\big]
+    \end{equation}
+
+    \section{Headroom callback va gioi han thoi gian}
+    Dieu kien on dinh realtime:
+    \begin{equation}
+        T_{proc} < T_{buffer}
+    \end{equation}
+    Dinh nghia headroom:
+    \begin{equation}
+        H = T_{buffer} - T_{proc}
+    \end{equation}
+    Neu $H < 0$, he thong se xuat hien underrun. Mot tien ich monitoring thu thap thoi gian callback va so lan overrun de dieu chinh $L$ hoac toi uu FFT.
+
+    \section{On dinh so hoc va bien do}
+    FFT convolution su dung float32. De tranh clipping tai output, tin hieu nen duoc dam bao nam trong khoang $[-1, 1]$ bang gain co dinh hoac limiter don gian truoc khi xuat ra driver.
+
+    \section{Minh hoa thoi gian va dong bo}
+    \begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[>=Latex]
+        \draw[->] (0,0) -- (10,0) node[right]{time};
+        \draw[fill=black] (1,0) circle (0.04) node[above]{\small $t_{dev}$};
+        \draw[fill=black] (5,0) circle (0.04) node[above]{\small $t_{host}$};
+        \draw[fill=black] (7.5,0) circle (0.04) node[above]{\small $t_{consume}$};
+        \draw[<->] (1,-0.6) -- node[below]{\small $d_{uart}$} (5,-0.6);
+        \draw[<->] (5,-1.2) -- node[below]{\small $d_{queue}$} (7.5,-1.2);
+    \end{tikzpicture}
+    \caption{Minh hoa dong bo timestamp va do tre UART/queue.}
+    \label{fig:timing_uart_queue}
+    \end{figure}
+
+    \begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}
+        \draw (0,0) rectangle (8,1);
+        \draw[fill=blue!20] (0,0) rectangle (3,1);
+        \draw[<->] (0,-0.4) -- node[below]{\small $T_{proc}$} (3,-0.4);
+        \draw[<->] (3,-0.4) -- node[below]{\small $H$} (8,-0.4);
+        \node at (4,0.5) {\small $T_{buffer}$};
+    \end{tikzpicture}
+    \caption{Minh hoa headroom callback so voi $T_{buffer}$.}
+    \label{fig:callback_headroom}
+    \end{figure}
+
+    \begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}
+        \draw[->] (0,0) -- (8,0) node[right]{freq};
+        \draw[->] (0,0) -- (0,3) node[above]{mag};
+        \draw[thick] plot coordinates {
+            (0.3,0.4) (0.8,0.9) (1.5,1.6) (2.2,2.4)
+            (3.0,1.8) (3.8,1.0) (4.6,1.7) (5.4,2.2)
+            (6.2,1.4) (7.2,1.1)
+        };
+        \draw[dashed] (3.8,0) -- (3.8,1.0);
+        \node[below] at (3.8,0) {\small notch};
+    \end{tikzpicture}
+    \caption{Dang dap ung tan so HRIR (minh hoa dinh tinh).}
+    \label{fig:hrir_response}
+    \end{figure}
+
+    \begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}
+        \draw[->] (0,0) -- (8,0) node[right]{time};
+        \draw[->] (0,0) -- (0,3) node[above]{queue depth};
+        \draw[thick] (0,0) -- (1,0) -- (1,1) -- (2,1) -- (2,2) -- (3,2) -- (3,1)
+                    -- (4,1) -- (4,2) -- (5,2) -- (5,3) -- (6,3) -- (6,1) -- (7,1) -- (7,0) -- (8,0);
+        \node[right] at (6,2.8) {\small backlog};
+    \end{tikzpicture}
+    \caption{Minh hoa dao dong queue khi toc do UART va worker khac nhau.}
+    \label{fig:queue_occupancy}
+    \end{figure}
+
+    \section{Do thi do luong (minh hoa)}
+    \begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}
+        \draw[->] (0,0) -- (8,0) node[right]{time};
+        \draw[->] (0,0) -- (0,3) node[above]{ms};
+        \draw[thick] plot coordinates {
+            (0.5,0.9) (1.2,1.1) (2.0,0.8) (2.8,1.6)
+            (3.6,1.0) (4.5,1.2) (5.2,0.9) (6.0,1.4) (7.2,1.0)
+        };
+        \draw[dashed] (0,1.5) -- (8,1.5) node[right]{\small budget};
+    \end{tikzpicture}
+    \caption{Thoi gian xu ly callback theo thoi gian (minh hoa).}
+    \label{fig:callback_timing_plot}
+    \end{figure}
+
+    \begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}
+        \draw[->] (0,0) -- (8,0) node[right]{time};
+        \draw[->] (0,0) -- (0,3) node[above]{yaw (deg)};
+        \draw[dashed] (0,2.5) -- (8,2.5) node[right]{\small target};
+        \draw[thick] plot coordinates {
+            (0.5,0.3) (1.2,0.8) (2.0,1.4) (3.0,2.0)
+            (4.0,2.2) (5.0,2.35) (6.0,2.45) (7.2,2.5)
+        };
+    \end{tikzpicture}
+    \caption{Dap ung yaw theo thoi gian (minh hoa).}
+    \label{fig:yaw_response_plot}
+    \end{figure}
+
+    \section{Rang buoc thoi gian}
+    Voi $F_s = 48000\,\text{Hz}$ va $L = 256$:
+    \begin{equation}
+        T_{buffer} = \frac{256}{48000} \approx 5.33\,\text{ms}
+    \end{equation}
+    Toan bo pipeline (convolution + output callback) phai hoan tat trong khoang thoi gian nay de tranh underrun.
+
+    \section{Mo hinh luong (threads)}
+    \begin{itemize}
+        \item \textbf{Serial thread:} doc UART, parse quaternion, dua vao queue.
+        \item \textbf{Orientation worker:} lay queue, lam muot quaternion, cap nhat HRIR/FFT.
+        \item \textbf{Audio callback:} doc block audio, convolution, ghi ra output (khong duoc block).
+    \end{itemize}
+
+    \begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        box/.style={rectangle, draw, rounded corners, align=center, minimum height=0.9cm},
+        line/.style={draw, -{Latex[scale=1.1]}, thick}
+    ]
+    \node[box] (serial) {Serial Thread};
+    \node[box, right=1.8cm of serial] (queue) {Queue};
+    \node[box, right=1.8cm of queue] (worker) {Orientation Worker};
+    \node[box, below=1.2cm of worker] (atomic) {Atomic Convolver Ref};
+    \node[box, left=1.8cm of atomic] (audio) {Audio Callback};
+
+    \path[line] (serial) -- (queue);
+    \path[line] (queue) -- (worker);
+    \path[line] (worker) -- (atomic);
+    \path[line] (atomic) -- (audio);
+    \end{tikzpicture}
+    \caption{So do dong bo thread va con trieu bo loc.}
+    \label{fig:thread_sync}
+    \end{figure}
+
+    \section{Thuat toan block realtime}
+    \begin{algorithm}[H]
+    \caption{Realtime Spatial Audio (Repo)}
+    \label{alg:repo_pipeline}
+    \begin{algorithmic}[1]
+    \State Init audio buffer, load CIPIC HRTF
+    \State Start Serial thread and Orientation worker
+    \While{Audio stream active}
+        \State Read mono block $x$ (size $L$)
+        \State Fetch current convolver (HRIR FFT precomputed)
+        \State $y_L, y_R \gets \text{OverlapAddConvolution}(x, h_{L,R})$
+        \State Output $(y_L, y_R)$ via sounddevice
+    \EndWhile
+    \end{algorithmic}
+    \end{algorithm}
+
+    \newpage
+
+    % ------------------ CHUONG 4 ------------------
+    \chapter{Danh Gia He Thong}
+
+    \section{Thoi gian callback va headroom}
+    Thong so callback duoc do trong qua trinh chay thuc te. Bang sau la mau thong ke de cap nhat:
+    \begin{table}[htbp]
+    \centering
+    \caption{Thong ke thoi gian callback theo kich thuoc block (can cap nhat).}
+    \label{tab:callback_stats}
+    \begin{tabular}{lcccc}
+    \toprule
+    Block size & FFT size & Avg (ms) & Peak (ms) & Overrun count \\
+    \midrule
+    128 & -- & -- & -- & -- \\
+    256 & -- & -- & -- & -- \\
+    512 & -- & -- & -- & -- \\
+    \bottomrule
+    \end{tabular}
+    \end{table}
+
+    \section{UART jitter va queue age}
+    Do tre UART va queue age duoc theo doi theo thoi gian. Cac tri so trung binh/do lech chuan nen duoc cap nhat tu log:
+    \begin{table}[htbp]
+    \centering
+    \caption{Thong ke UART jitter va queue age (can cap nhat).}
+    \label{tab:uart_jitter}
+    \begin{tabular}{lcc}
+    \toprule
+    Metric & Avg (ms) & Std (ms) \\
+    \midrule
+    UART delay & -- & -- \\
+    Queue age & -- & -- \\
+    \bottomrule
+    \end{tabular}
+    \end{table}
+
+    \section{Orientation drift}
+    Dat IMU o trang thai co dinh trong 5 phut, ghi lai yaw va tinh drift (deg/min). Do drift nang se danh gia nhu mot gioi han he thong.
+
+    \section{Danh gia chu quan}
+    Thuc hien nghe thu voi cac thao tac quay dau trai/phai va tien/lui. Ghi nhan:
+    \begin{itemize}
+        \item Do on dinh vi tri nguon am khi xoay dau.
+        \item Kha nang phan biet truoc/sau (front-back confusion).
+        \item Muc do tu nhien cua khong gian (subjective spatial impression).
+    \end{itemize}
+
+    \newpage
+
+    % ------------------ CHUONG 5 ------------------
+    \chapter{So sanh voi mo ta LaTeX cu}
+
+    \section{Phan giong nhau}
+    \begin{itemize}
+        \item Kien truc end-to-end IMU -> UART -> host -> HRTF -> convolution -> output.
+        \item Xu ly theo block va co rang buoc thoi gian thuc.
+        \item Su dung quaternion de bieu dien huong nhin.
+    \end{itemize}
+
+    \section{Phan khac biet}
+    \begin{itemize}
+        \item Fusion chay tren MCU (Madgwick), khong phai MATLAB complementary filter.
+        \item Convolution da chuyen sang overlap-add FFT, khong con FIR time-domain.
+        \item Sample rate 48 kHz (khong phai 44.1 kHz).
+        \item Khong co LR4 crossover va soft clipping trong pipeline hien tai.
+        \item Audio driver dung \texttt{sounddevice}, khong su dung ASIO.
+    \end{itemize}
+
+    \newpage
+
+    % ------------------ CHUONG 6 ------------------
+    \chapter{Ket luan va huong mo rong}
+
+    \section{Gioi han hien tai}
+    \begin{itemize}
+        \item Yaw drift do khong co magnetometer.
+        \item HRTF interpolation dang o muc don gian (nearest/linear).
+        \item Hieu nang phu thuoc vao callback audio va kich thuoc block.
+        \item HRTF ca nhan hoa chua duoc ho tro; CIPIC chung co the gay sai lech localization giua cac nguoi dung.
+    \end{itemize}
+
+    \section{Huong phat trien}
+    \begin{itemize}
+        \item Them magnetometer va bo loc EKF de giam drift.
+        \item Noisuy HRTF nang cao (minimum-phase, time-aligned).
+        \item Tang toc convolution (GPU hoac SIMD) va toi uu buffer.
+    \end{itemize}
+
+    \begin{thebibliography}{9}
+    \bibitem{madgwick2011}
+    S. O. H. Madgwick, ``An efficient orientation filter for inertial and inertial/magnetic sensor arrays,'' 2011.
+
+    \bibitem{cipic2001}
+    V. R. Algazi, R. O. Duda, D. M. Thompson, and C. Avendano, ``The CIPIC HRTF database,'' 2001.
+
+    \bibitem{oppenheim2010}
+    A. V. Oppenheim and R. W. Schafer, \textit{Discrete-Time Signal Processing}, 3rd ed., 2010.
+
+    \bibitem{shoemake1985}
+    K. Shoemake, ``Animating rotation with quaternion curves,'' 1985.
+
+    \bibitem{portaudio}
+    PortAudio, ``Portable Real-Time Audio Library.'' [Online]. Available: \url{https://www.portaudio.com/}
+    \end{thebibliography}
+
+    \end{document}
