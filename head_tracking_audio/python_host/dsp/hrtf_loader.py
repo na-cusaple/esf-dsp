@@ -49,7 +49,19 @@ def load_cipic_mat(mat_path, target_sample_rate=None, source_sample_rate=None):
 	elev = data.get("elev_v")
 
 	if hrir_l is None or hrir_r is None or azim is None or elev is None:
-		raise ValueError("Missing CIPIC keys: hrir_l/hrir_r/azim_v/elev_v")
+		# allow MAT files that contain HRIR arrays but not azimuth/elevation vectors
+		if hrir_l is None or hrir_r is None:
+			raise ValueError("Missing CIPIC keys: hrir_l/hrir_r/azim_v/elev_v")
+		# infer azimuth/elevation indices from HRIR shape
+		shp = np.shape(hrir_l)
+		if len(shp) >= 3:
+			n1, n2 = int(shp[0]), int(shp[1])
+		elif len(shp) == 2:
+			n1, n2 = int(shp[0]), 1
+		else:
+			n1, n2 = 1, 1
+		azim = np.arange(n2)
+		elev = np.arange(n1)
 
 	azim = np.array(azim).reshape(-1)
 	elev = np.array(elev).reshape(-1)
